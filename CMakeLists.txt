@@ -5,7 +5,15 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-find_package(Crow REQUIRED)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CROW_ENABLE_COMPRESSION ON)
+set(CROW_ENABLE_SSL ON)
+
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Debug")
+endif()
+
+add_subdirectory(external/Crow)
 
 find_package(OpenSSL REQUIRED)
 find_package(ZLIB REQUIRED)
@@ -20,5 +28,4 @@ target_link_libraries(todo_api
     OpenSSL::SSL
     OpenSSL::Crypto
     ZLIB::ZLIB
-    pthread
 )
