@@ -17,10 +17,13 @@ add_subdirectory(external/Crow)
 
 find_package(OpenSSL REQUIRED)
 find_package(ZLIB REQUIRED)
+find_package(SQLite3 REQUIRED)
 
-add_executable(todo_api
-    src/main.cpp
+file(GLOB_RECURSE SOURCES
+    ${CMAKE_SOURCE_DIR}/src/*.cpp
 )
+
+add_executable(todo_api ${SOURCES})
 
 target_link_libraries(todo_api
     PRIVATE
@@ -28,4 +31,5 @@ target_link_libraries(todo_api
     OpenSSL::SSL
     OpenSSL::Crypto
     ZLIB::ZLIB
+    SQLite::SQLite3
 )

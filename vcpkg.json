@@ -2,6 +2,12 @@
   "dependencies": [
     "zlib",
     "openssl",
-    "asio"
+    "asio",
+    {
+      "name": "sqlite3",
+      "features": [
+        "unicode"
+      ]
+    }
   ]
 }
