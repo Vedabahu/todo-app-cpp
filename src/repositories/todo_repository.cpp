@@ -87,3 +87,77 @@ std::vector<Todo> TodoRepository::getTodosByUserId(const std::string &user_id)
 
     return todos;
 }
+
+bool TodoRepository::updateCompleted(const std::string &todo_id, const std::string &user_id, bool completed)
+{
+    sqlite3 *db = database_.openConnection();
+
+    const char *sql = "UPDATE todos "
+                      "SET completed = ? "
+                      "WHERE id = ? AND user_id = ?;";
+
+    sqlite3_stmt *stmt = nullptr;
+
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr);
+    if (rc != SQLITE_OK)
+    {
+        sqlite3_close(db);
+        throw std::runtime_error(sqlite3_errmsg(db));
+    }
+
+    sqlite3_bind_int(stmt, 1, completed ? 1 : 0);
+    sqlite3_bind_text(stmt, 2, todo_id.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 3, user_id.c_str(), -1, SQLITE_TRANSIENT);
+
+    rc = sqlite3_step(stmt);
+
+    if (rc != SQLITE_DONE)
+    {
+        sqlite3_finalize(stmt);
+        sqlite3_close(db);
+        throw std::runtime_error(sqlite3_errmsg(db));
+    }
+
+    int changes = sqlite3_changes(db);
+
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+
+    return changes > 0;
+}
+
+bool TodoRepository::deleteTodo(const std::string &todo_id, const std::string &user_id)
+{
+    sqlite3 *db = database_.openConnection();
+
+    const char *sql = "DELETE FROM todos "
+                      "WHERE id = ? AND user_id = ?;";
+
+    sqlite3_stmt *stmt = nullptr;
+
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr);
+    if (rc != SQLITE_OK)
+    {
+        sqlite3_close(db);
+        throw std::runtime_error(sqlite3_errmsg(db));
+    }
+
+    sqlite3_bind_text(stmt, 1, todo_id.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 2, user_id.c_str(), -1, SQLITE_TRANSIENT);
+
+    rc = sqlite3_step(stmt);
+
+    if (rc != SQLITE_DONE)
+    {
+        sqlite3_finalize(stmt);
+        sqlite3_close(db);
+        throw std::runtime_error(sqlite3_errmsg(db));
+    }
+
+    int changes = sqlite3_changes(db);
+
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+
+    return changes > 0;
+}

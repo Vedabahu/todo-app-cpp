@@ -31,6 +31,6 @@ int main()
     CROW_ROUTE(app, "/add/<int>/<int>")
     ([](int a, int b) { return std::to_string(a + b); });
 
-    // app.port(18080).multithreaded().run();
-    app.port(18080).run();
+    app.port(18080).multithreaded().run();
+    // app.port(18080).run();
 }

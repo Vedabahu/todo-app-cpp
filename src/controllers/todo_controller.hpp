@@ -66,4 +66,47 @@ template <typename App> void register_todo_routes(App &app, TodoRepository &todo
 
         return crow::response(response);
     });
+
+    CROW_ROUTE(app, "/todos/<string>")
+        .methods(crow::HTTPMethod::Patch)([&app, &todoRepo](const crow::request &req, const std::string &id) {
+            auto &ctx = app.template get_context<AuthMiddleware>(req);
+
+            if (!ctx.user_id)
+                return crow::response(401, "Unauthorized");
+
+            auto body = crow::json::load(req.body);
+
+            if (!body)
+                return crow::response(400, "Invalid JSON");
+
+            if (!body.has("completed") ||
+                body["completed"].t() != crow::json::type::True && body["completed"].t() != crow::json::type::False)
+            {
+                return crow::response(400, "Missing or invalid completed field");
+            }
+
+            bool completed = body["completed"].b();
+
+            bool success = todoRepo.updateCompleted(id, *ctx.user_id, completed);
+
+            if (!success)
+                return crow::response(404, "Todo not found");
+
+            return crow::response(200, "Updated");
+        });
+
+    CROW_ROUTE(app, "/todos/<string>")
+        .methods(crow::HTTPMethod::Delete)([&app, &todoRepo](const crow::request &req, const std::string &id) {
+            auto &ctx = app.template get_context<AuthMiddleware>(req);
+
+            if (!ctx.user_id)
+                return crow::response(401, "Unauthorized");
+
+            bool success = todoRepo.deleteTodo(id, *ctx.user_id);
+
+            if (!success)
+                return crow::response(404, "Todo not found");
+
+            return crow::response(200, "Deleted");
+        });
 }
