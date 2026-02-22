@@ -17,6 +17,7 @@ A RESTful backend API for a Todo application, built with **C++23**, **[Crow](htt
   - [3. Configure with CMake](#3-configure-with-cmake)
   - [4. Build](#4-build)
   - [5. Run](#5-run)
+- [Docker](#docker)
 - [Dev Container](#dev-container)
 - [API Reference](#api-reference)
 - [Project Structure](#project-structure)
@@ -42,24 +43,24 @@ Secondly, most backend services are written in JavaScript (Node.js), Python, or 
 
 ### Potential Downsides
 
-- **Longer compile times** — A full rebuild with CMake + vcpkg dependencies can take several minutes on first run.
-- **Manual memory safety** — Without disciplined use of smart pointers or RAII wrappers, dangling pointers and resource leaks are possible. This project manages SQLite connections manually, which requires careful auditing.
-- **SQLite access may not be thread-safe** — Each operation opens and closes a fresh SQLite connection, which avoids shared-state races but adds syscall overhead per request. A connection pool would be needed for high throughput.
-- **SHA-256 for password hashing** — SHA-256 is a fast cryptographic hash, not a password-hardening function. It was chosen intentionally for simplicity. Production systems should use Argon2 or bcrypt.
-- **Steeper onboarding** — Contributors familiar only with JavaScript or Python will need time to get comfortable with the build system, templates, and memory model.
-- **Smaller ecosystem** — Fewer ready-made middleware and plug-and-play libraries compared to the Node.js or Python ecosystems.
+- **Longer compile times** - A full rebuild with CMake + vcpkg dependencies can take several minutes on first run.
+- **Manual memory safety** - Without disciplined use of smart pointers or RAII wrappers, dangling pointers and resource leaks are possible. This project manages SQLite connections manually, which requires careful auditing.
+- **SQLite access may not be thread-safe** - Each operation opens and closes a fresh SQLite connection, which avoids shared-state races but adds syscall overhead per request. A connection pool would be needed for high throughput.
+- **SHA-256 for password hashing** - SHA-256 is a fast cryptographic hash, not a password-hardening function. It was chosen intentionally for simplicity. Production systems should use Argon2 or bcrypt.
+- **Steeper onboarding** - Contributors familiar only with JavaScript or Python will need time to get comfortable with the build system, templates, and memory model.
+- **Smaller ecosystem** - Fewer ready-made middleware and plug-and-play libraries compared to the Node.js or Python ecosystems.
 
 ---
 
 ## Features
 
-- **User Registration** — Accepts a username and password; stores the user with a SHA-256 hashed password and a UUID primary key.
-- **HTTP Basic Auth Middleware** — All routes except `POST /register` are gated by a Crow middleware that decodes the `Authorization` header, verifies credentials, and injects the authenticated `user_id` into the request context.
-- **Current User** — `GET /me` returns the authenticated user's `id` and `username`.
-- **Full Todo CRUD** — Create, list, update completion status, and delete todos, all scoped to the authenticated user.
-- **SQLite3 Persistence** — Lightweight embedded database with WAL journal mode for improved concurrency.
-- **GZIP Compression** — All responses are served with GZIP compression.
-- **Layered Architecture** — Clean separation between middleware, controllers, services, repositories, models, and utilities.
+- **User Registration** - Accepts a username and password; stores the user with a SHA-256 hashed password and a UUID primary key.
+- **HTTP Basic Auth Middleware** - All routes except `POST /register` are gated by a Crow middleware that decodes the `Authorization` header, verifies credentials, and injects the authenticated `user_id` into the request context.
+- **Current User** - `GET /me` returns the authenticated user's `id` and `username`.
+- **Full Todo CRUD** - Create, list, update completion status, and delete todos, all scoped to the authenticated user.
+- **SQLite3 Persistence** - Lightweight embedded database with WAL journal mode for improved concurrency.
+- **GZIP Compression** - All responses are served with GZIP compression.
+- **Layered Architecture** - Clean separation between middleware, controllers, services, repositories, models, and utilities.
 
 ---
 
@@ -68,10 +69,10 @@ Secondly, most backend services are written in JavaScript (Node.js), Python, or 
 ```mermaid
 flowchart TD
     A["HTTP Request"] --> B["AuthMiddleware<br/>Decodes Basic Auth header<br/>Injects user_id into context<br/>Bypasses /register"]
-    B --> C["Controllers<br/>auth_controller — POST /register, GET /me<br/>todo_controller — POST /todos, GET /todos"]
-    C --> D["Services<br/>AuthService — registerUser, verifyBasicAuth<br/>Hashing — SHA-256 via OpenSSL<br/>UUID — UUID v4 generation"]
-    D --> E["Repositories<br/>UserRepository — user lookup & creation<br/>TodoRepository — todo create & list"]
-    E --> F["Database<br/>SQLite3 — connection management<br/>Schema initialisation on startup"]
+    B --> C["Controllers<br/>auth_controller - POST /register, GET /me<br/>todo_controller - POST /todos, GET /todos"]
+    C --> D["Services<br/>AuthService - registerUser, verifyBasicAuth<br/>Hashing - SHA-256 via OpenSSL<br/>UUID - UUID v4 generation"]
+    D --> E["Repositories<br/>UserRepository - user lookup & creation<br/>TodoRepository - todo create & list"]
+    E --> F["Database<br/>SQLite3 - connection management<br/>Schema initialisation on startup"]
 ```
 
 ---
@@ -197,6 +198,14 @@ curl http://localhost:18080/register \
   -H "Content-Type: application/json" \
   -d '{"username": "Vedabahu", "password": "secret123"}'
 ```
+
+---
+
+## Docker 
+
+- Clone the repo - `git clone --recurse-submodules https://github.com/Vedabahu/todo-app-cpp`
+- Build the image - `docker build -f docker/Dockerfile -t todo-app-cpp .`
+- Run the container - `docker run -p 18080:18080 todo-app-cpp`
 
 ---
 
@@ -440,14 +449,14 @@ CREATE TABLE IF NOT EXISTS todos (
 
 ## Roadmap
 
-- [x] **Basic Auth middleware** — Decodes `Authorization` header, verifies credentials, injects `user_id` into Crow context
-- [x] **`POST /todos`** — Create a todo for the authenticated user
-- [x] **`GET /todos`** — List all todos for the authenticated user
-- [x] **`GET /me`** — Return the authenticated user's profile
-- [x] **`PATCH /todos/:id`** — Update the `completed` status of a todo
-- [x] **`DELETE /todos/:id`** — Delete a todo
-- [ ] **Docker Compose** — Containerized deployment
-- [ ] **Password hardening** *(optional)* — Swap SHA-256 for Argon2 or bcrypt
+- [x] **Basic Auth middleware** - Decodes `Authorization` header, verifies credentials, injects `user_id` into Crow context
+- [x] **`POST /todos`** - Create a todo for the authenticated user
+- [x] **`GET /todos`** - List all todos for the authenticated user
+- [x] **`GET /me`** - Return the authenticated user's profile
+- [x] **`PATCH /todos/:id`** - Update the `completed` status of a todo
+- [x] **`DELETE /todos/:id`** - Delete a todo
+- [X] **Docker** - Containerized deployment
+- [ ] **Password hardening** *(optional)* - Swap SHA-256 for Argon2 or bcrypt
 
 ---
 
@@ -455,9 +464,9 @@ CREATE TABLE IF NOT EXISTS todos (
 
 This project was built with AI assistance in specific, deliberate ways:
 
-- **Planning & directory structure** — AI was used to think through the layered architecture (middleware → controllers → services → repositories → database).
-- **README** — This document was written and iteratively refined with AI assistance based on the actual code.
-- **Code & debugging** — All implementation code was written and debugged by me.
+- **Planning & directory structure** - AI was used to think through the layered architecture (middleware → controllers → services → repositories → database).
+- **README** - This document was written and iteratively refined with AI assistance based on the actual code.
+- **Code & debugging** - All implementation code was written and debugged by me.
 
 I think this is an honest and reasonable way to use AI: for high-level structural decisions and documentation where it saves significant time, while keeping the actual programming work as the learning experience.
 
