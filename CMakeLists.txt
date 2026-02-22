@@ -25,7 +25,7 @@ file(GLOB_RECURSE SOURCES
 
 add_executable(todo_api ${SOURCES})
 
-target_link_libraries(todo_api
+target_link_libraries(todo_api -static
     PRIVATE
     Crow::Crow
     OpenSSL::SSL
