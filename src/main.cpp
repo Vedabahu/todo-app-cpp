@@ -4,6 +4,7 @@
 
 #include "controllers/auth_controller.hpp"
 #include "database/database.hpp"
+#include "middleware/auth_middleware.hpp"
 #include "repositories/user_repository.hpp"
 #include "services/auth_service.hpp"
 
@@ -17,10 +18,15 @@ int main()
     UserRepository userRepo(db);
     AuthService authService(userRepo);
 
-    crow::App app;
+    crow::App<AuthMiddleware> app;
+    app.get_middleware<AuthMiddleware>().auth_service = &authService;
     app.use_compression(crow::compression::algorithm::GZIP);
 
     register_auth_routes(app, authService);
 
-    app.port(18080).multithreaded().run();
+    CROW_ROUTE(app, "/add/<int>/<int>")
+    ([](int a, int b) { return std::to_string(a + b); });
+
+    // app.port(18080).multithreaded().run();
+    app.port(18080).run();
 }

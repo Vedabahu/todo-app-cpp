@@ -50,7 +50,7 @@ std::optional<User> UserRepository::findByUsername(const std::string &username)
 {
     sqlite3 *db = database_.openConnection();
 
-    const char *sql = "SELECT id, username, password_hash"
+    const char *sql = "SELECT id, username, password_hash "
                       "FROM users WHERE username = ? LIMIT 1;";
 
     sqlite3_stmt *stmt = nullptr;
