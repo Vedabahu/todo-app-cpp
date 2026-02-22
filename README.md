@@ -1,8 +1,6 @@
 # Todo App - C++ Backend API
 
-A RESTful backend API for a Todo application, built with **C++23**, **[Crow](https://crowcpp.org/)** (a fast HTTP micro-framework), and **SQLite3** for persistence. User registration, HTTP Basic Auth, and partial todo operations are implemented.
-
-> **Status: Work in Progress** — `PUT /todos/:id`, `DELETE /todos/:id`, and `GET /todos/:id` are not yet implemented.
+A RESTful backend API for a Todo application, built with **C++23**, **[Crow](https://crowcpp.org/)** (a fast HTTP micro-framework), and **SQLite3** for persistence.
 
 ---
 
@@ -24,6 +22,7 @@ A RESTful backend API for a Todo application, built with **C++23**, **[Crow](htt
 - [Project Structure](#project-structure)
 - [Database Schema](#database-schema)
 - [Roadmap](#roadmap)
+- [AI Usage](#ai-usage)
 - [My Thoughts](#my-thoughts)
 - [License](#license)
 
@@ -43,12 +42,12 @@ Secondly, most backend services are written in JavaScript (Node.js), Python, or 
 
 ### Potential Downsides
 
-- **Longer compile times** - A full rebuild with CMake + vcpkg dependencies can take several minutes on first run.
-- **Manual memory safety** - Without smart-pointer discipline, dangling pointers and use-after-free bugs are possible. The project uses RAII throughout, but vigilance is required.
-- **SQLite access may not be thread-safe** - Each request opens a fresh SQLite connection (per the current `Database` design), which avoids shared-state bugs but adds syscall overhead. A connection pool would be needed for high throughput.
-- **SHA-256 for password hashing** - SHA-256 is a fast cryptographic hash, not a password-hardening function. It was chosen intentionally for simplicity in this project. Production systems should use Argon2 or bcrypt (adding either as an optional component is on the roadmap).
-- **Steeper onboarding** - Contributors familiar only with JavaScript or Python will need time to get comfortable with the build system, templates, and memory model.
-- **Smaller ecosystem** - Fewer ready-made middleware and plug-and-play libraries compared to the Node.js or Python ecosystems.
+- **Longer compile times** — A full rebuild with CMake + vcpkg dependencies can take several minutes on first run.
+- **Manual memory safety** — Without disciplined use of smart pointers or RAII wrappers, dangling pointers and resource leaks are possible. This project manages SQLite connections manually, which requires careful auditing.
+- **SQLite access may not be thread-safe** — Each operation opens and closes a fresh SQLite connection, which avoids shared-state races but adds syscall overhead per request. A connection pool would be needed for high throughput.
+- **SHA-256 for password hashing** — SHA-256 is a fast cryptographic hash, not a password-hardening function. It was chosen intentionally for simplicity. Production systems should use Argon2 or bcrypt.
+- **Steeper onboarding** — Contributors familiar only with JavaScript or Python will need time to get comfortable with the build system, templates, and memory model.
+- **Smaller ecosystem** — Fewer ready-made middleware and plug-and-play libraries compared to the Node.js or Python ecosystems.
 
 ---
 
@@ -57,7 +56,7 @@ Secondly, most backend services are written in JavaScript (Node.js), Python, or 
 - **User Registration** — Accepts a username and password; stores the user with a SHA-256 hashed password and a UUID primary key.
 - **HTTP Basic Auth Middleware** — All routes except `POST /register` are gated by a Crow middleware that decodes the `Authorization` header, verifies credentials, and injects the authenticated `user_id` into the request context.
 - **Current User** — `GET /me` returns the authenticated user's `id` and `username`.
-- **Todo Create & List** — `POST /todos` creates a todo for the authenticated user; `GET /todos` lists all of that user's todos.
+- **Full Todo CRUD** — Create, list, update completion status, and delete todos, all scoped to the authenticated user.
 - **SQLite3 Persistence** — Lightweight embedded database with WAL journal mode for improved concurrency.
 - **GZIP Compression** — All responses are served with GZIP compression.
 - **Layered Architecture** — Clean separation between middleware, controllers, services, repositories, models, and utilities.
@@ -66,33 +65,13 @@ Secondly, most backend services are written in JavaScript (Node.js), Python, or 
 
 ## Architecture
 
-```
-HTTP Request
-     │
-     ▼
-┌─────────────────┐
-│   Middleware    │  AuthMiddleware: decodes Basic Auth header, injects user_id into context
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│   Controllers   │  Parses request, reads auth context, validates input, returns response
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│    Services     │  Business logic (verifyBasicAuth, registerUser, hashing, UUIDs)
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  Repositories   │  SQL queries; abstracts all database access
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│    Database     │  SQLite3 connection management + schema initialization
-└─────────────────┘
+```mermaid
+flowchart TD
+    A["HTTP Request"] --> B["AuthMiddleware<br/>Decodes Basic Auth header<br/>Injects user_id into context<br/>Bypasses /register"]
+    B --> C["Controllers<br/>auth_controller — POST /register, GET /me<br/>todo_controller — POST /todos, GET /todos"]
+    C --> D["Services<br/>AuthService — registerUser, verifyBasicAuth<br/>Hashing — SHA-256 via OpenSSL<br/>UUID — UUID v4 generation"]
+    D --> E["Repositories<br/>UserRepository — user lookup & creation<br/>TodoRepository — todo create & list"]
+    E --> F["Database<br/>SQLite3 — connection management<br/>Schema initialisation on startup"]
 ```
 
 ---
@@ -360,13 +339,35 @@ List all todos belonging to the authenticated user.
 
 ---
 
-### Todos *(Not yet implemented)*
+### `PATCH /todos/:id`
 
-| Method   | Endpoint         | Description                   |
-|----------|------------------|-------------------------------|
-| `GET`    | `/todos/:id`     | Get a specific todo by ID     |
-| `PUT`    | `/todos/:id`     | Update a todo (title/status)  |
-| `DELETE` | `/todos/:id`     | Delete a todo                 |
+Update the `completed` status of a todo. Only the owner can update their own todos.
+
+**Request Body** *(application/json)*:
+```json
+{
+  "completed": true
+}
+```
+
+| Status | Meaning                              |
+|--------|--------------------------------------|
+| `200`  | Updated                              |
+| `400`  | Missing/invalid `completed` field    |
+| `401`  | Unauthorized                         |
+| `404`  | Todo not found or not owned by user  |
+
+---
+
+### `DELETE /todos/:id`
+
+Delete a todo. Only the owner can delete their own todos.
+
+| Status | Meaning                              |
+|--------|--------------------------------------|
+| `200`  | Deleted                              |
+| `401`  | Unauthorized                         |
+| `404`  | Todo not found or not owned by user  |
 
 ---
 
@@ -385,7 +386,7 @@ todo-app-cpp/
 │   │   └── auth_middleware.hpp  # Crow middleware: Basic Auth decode & user_id injection
 │   ├── controllers/
 │   │   ├── auth_controller.hpp  # POST /register, GET /me
-│   │   └── todo_controller.hpp  # POST /todos, GET /todos
+│   │   └── todo_controller.hpp  # POST /todos, GET /todos, PATCH /todos/:id, DELETE /todos/:id
 │   ├── database/
 │   │   ├── database.hpp
 │   │   └── database.cpp         # SQLite connection management & schema init
@@ -394,7 +395,7 @@ todo-app-cpp/
 │   │   └── todo.hpp             # Todo struct (id, user_id, title, completed)
 │   ├── repositories/
 │   │   ├── user_repository.hpp / .cpp   # SQL queries for user lookup & creation
-│   │   └── todo_repository.hpp / .cpp   # SQL queries for todo create & list
+│   │   └── todo_repository.hpp / .cpp   # SQL queries for todo create, list, update & delete
 │   ├── services/
 │   │   ├── auth_service.hpp
 │   │   └── auth_service.cpp     # registerUser(), verifyBasicAuth()
@@ -443,14 +444,22 @@ CREATE TABLE IF NOT EXISTS todos (
 - [x] **`POST /todos`** — Create a todo for the authenticated user
 - [x] **`GET /todos`** — List all todos for the authenticated user
 - [x] **`GET /me`** — Return the authenticated user's profile
-- [ ] **`GET /todos/:id`** — Get a specific todo by ID
-- [ ] **`PUT /todos/:id`** — Update todo title or completion status
-- [ ] **`DELETE /todos/:id`** — Delete a todo
-- [ ] **Input validation** — Length limits, sanitization
-- [ ] **Logging** — Structured request/response logging
-- [ ] **Tests** — Unit and integration tests
+- [x] **`PATCH /todos/:id`** — Update the `completed` status of a todo
+- [x] **`DELETE /todos/:id`** — Delete a todo
 - [ ] **Docker Compose** — Containerized deployment
 - [ ] **Password hardening** *(optional)* — Swap SHA-256 for Argon2 or bcrypt
+
+---
+
+## AI Usage
+
+This project was built with AI assistance in specific, deliberate ways:
+
+- **Planning & directory structure** — AI was used to think through the layered architecture (middleware → controllers → services → repositories → database).
+- **README** — This document was written and iteratively refined with AI assistance based on the actual code.
+- **Code & debugging** — All implementation code was written and debugged by me.
+
+I think this is an honest and reasonable way to use AI: for high-level structural decisions and documentation where it saves significant time, while keeping the actual programming work as the learning experience.
 
 ---
 
