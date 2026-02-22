@@ -1,8 +1,8 @@
 # Todo App - C++ Backend API
 
-A RESTful backend API for a Todo application, built with **C++23**, **[Crow](https://crowcpp.org/)** (a fast HTTP micro-framework), and **SQLite3** for persistence. The project currently provides user registration and lays the groundwork for full CRUD operations on todos.
+A RESTful backend API for a Todo application, built with **C++23**, **[Crow](https://crowcpp.org/)** (a fast HTTP micro-framework), and **SQLite3** for persistence. User registration, HTTP Basic Auth, and partial todo operations are implemented.
 
-> **Status: Work in Progress** - Basic Auth middleware and all Todo endpoints are not yet implemented.
+> **Status: Work in Progress** — `PUT /todos/:id`, `DELETE /todos/:id`, and `GET /todos/:id` are not yet implemented.
 
 ---
 
@@ -24,6 +24,8 @@ A RESTful backend API for a Todo application, built with **C++23**, **[Crow](htt
 - [Project Structure](#project-structure)
 - [Database Schema](#database-schema)
 - [Roadmap](#roadmap)
+- [My Thoughts](#my-thoughts)
+- [License](#license)
 
 ---
 
@@ -52,12 +54,13 @@ Secondly, most backend services are written in JavaScript (Node.js), Python, or 
 
 ## Features
 
-- **User Registration** - Accepts a username and password; stores the user with a SHA-256 hashed password and a UUID primary key.
-- **HTTP Basic Authentication** - Protected routes read the `Authorization` header, decode the Base64 `username:password` credential, and verify against the stored hash.
-- **SQLite3 Persistence** - Lightweight embedded database with WAL journal mode for improved concurrency.
-- **GZIP Compression** - All responses are served with GZIP compression.
-- **Multithreaded** - Crow runs in multithreaded mode for concurrent request handling.
-- **Layered Architecture** - Clean separation between controllers, services, repositories, models, and utilities.
+- **User Registration** — Accepts a username and password; stores the user with a SHA-256 hashed password and a UUID primary key.
+- **HTTP Basic Auth Middleware** — All routes except `POST /register` are gated by a Crow middleware that decodes the `Authorization` header, verifies credentials, and injects the authenticated `user_id` into the request context.
+- **Current User** — `GET /me` returns the authenticated user's `id` and `username`.
+- **Todo Create & List** — `POST /todos` creates a todo for the authenticated user; `GET /todos` lists all of that user's todos.
+- **SQLite3 Persistence** — Lightweight embedded database with WAL journal mode for improved concurrency.
+- **GZIP Compression** — All responses are served with GZIP compression.
+- **Layered Architecture** — Clean separation between middleware, controllers, services, repositories, models, and utilities.
 
 ---
 
@@ -68,12 +71,17 @@ HTTP Request
      │
      ▼
 ┌─────────────────┐
-│   Controllers   │  Parses HTTP requests, validates input, returns responses
+│   Middleware    │  AuthMiddleware: decodes Basic Auth header, injects user_id into context
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
-│    Services     │  Business logic (hashing, UUID generation, validation)
+│   Controllers   │  Parses request, reads auth context, validates input, returns response
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│    Services     │  Business logic (verifyBasicAuth, registerUser, hashing, UUIDs)
 └────────┬────────┘
          │
          ▼
@@ -285,53 +293,120 @@ Register a new user account. Does **not** require authentication.
 
 ---
 
+### `GET /me`
+
+Returns the authenticated user's profile.
+
+**Response** `200 OK`:
+```json
+{
+  "id": "<uuid>",
+  "username": "Vedabahu"
+}
+```
+
+| Status | Meaning        |
+|--------|----------------|
+| `200`  | OK             |
+| `401`  | Unauthorized   |
+| `404`  | User not found |
+
+---
+
+### `POST /todos`
+
+Create a new todo item for the authenticated user.
+
+**Request Body** *(application/json)*:
+```json
+{
+  "title": "Buy groceries"
+}
+```
+
+**Response** `201 Created`:
+```json
+{
+  "id": "<uuid>",
+  "title": "Buy groceries",
+  "completed": false
+}
+```
+
+| Status | Meaning                          |
+|--------|----------------------------------|
+| `201`  | Todo created                     |
+| `400`  | Missing/invalid title or JSON    |
+| `401`  | Unauthorized                     |
+
+---
+
+### `GET /todos`
+
+List all todos belonging to the authenticated user.
+
+**Response** `200 OK`:
+```json
+[
+  { "id": "<uuid>", "title": "Buy groceries", "completed": false },
+  { "id": "<uuid>", "title": "Write tests",   "completed": false }
+]
+```
+
+| Status | Meaning      |
+|--------|--------------|
+| `200`  | OK           |
+| `401`  | Unauthorized |
+
+---
+
 ### Todos *(Not yet implemented)*
 
-All todo endpoints will require a valid `Authorization: Basic ...` header.
-
-| Method   | Endpoint         | Description              |
-|----------|------------------|--------------------------|
-| `POST`   | `/todos`         | Create a new todo        |
-| `GET`    | `/todos`         | List all todos for user  |
-| `GET`    | `/todos/:id`     | Get a specific todo      |
-| `PUT`    | `/todos/:id`     | Update a todo            |
-| `DELETE` | `/todos/:id`     | Delete a todo            |
+| Method   | Endpoint         | Description                   |
+|----------|------------------|-------------------------------|
+| `GET`    | `/todos/:id`     | Get a specific todo by ID     |
+| `PUT`    | `/todos/:id`     | Update a todo (title/status)  |
+| `DELETE` | `/todos/:id`     | Delete a todo                 |
 
 ---
 
 ## Project Structure
 
 ```
-cpp_backend/
-├── .devcontainer/          # VS Code Dev Container configuration
+todo-app-cpp/
+├── .devcontainer/               # VS Code Dev Container configuration
 │   ├── Dockerfile
 │   └── devcontainer.json
 ├── external/
-│   └── Crow/               # Crow HTTP framework (git submodule)
+│   └── Crow/                    # Crow HTTP framework (git submodule)
 ├── src/
-│   ├── main.cpp            # Entry point: wires up DB, services, routes, and starts server
+│   ├── main.cpp                 # Entry point: wires middleware, DB, repos, services, routes
+│   ├── middleware/
+│   │   └── auth_middleware.hpp  # Crow middleware: Basic Auth decode & user_id injection
 │   ├── controllers/
-│   │   ├── auth_controller.hpp
-│   │   └── auth_controller.cpp   # Defines /register route
+│   │   ├── auth_controller.hpp  # POST /register, GET /me
+│   │   └── todo_controller.hpp  # POST /todos, GET /todos
 │   ├── database/
 │   │   ├── database.hpp
-│   │   └── database.cpp          # SQLite connection management & schema init
+│   │   └── database.cpp         # SQLite connection management & schema init
 │   ├── models/
-│   │   └── user.hpp              # User struct (id, username, password_hash)
+│   │   ├── user.hpp             # User struct (id, username, password_hash)
+│   │   └── todo.hpp             # Todo struct (id, user_id, title, completed)
 │   ├── repositories/
-│   │   ├── user_repository.hpp
-│   │   └── user_repository.cpp   # SQL queries for user CRUD
+│   │   ├── user_repository.hpp / .cpp   # SQL queries for user lookup & creation
+│   │   └── todo_repository.hpp / .cpp   # SQL queries for todo create & list
 │   ├── services/
 │   │   ├── auth_service.hpp
-│   │   └── auth_service.cpp      # Registration business logic
+│   │   └── auth_service.cpp     # registerUser(), verifyBasicAuth()
 │   └── utils/
-│       ├── hashing.hpp / .cpp    # SHA-256 via OpenSSL
-│       └── uuid.hpp / .cpp       # UUID v4 generation
-├── data/                   # Runtime database files (auto-created, gitignored)
+│       ├── hashing.hpp / .cpp   # SHA-256 via OpenSSL
+│       └── uuid.hpp / .cpp      # UUID v4 generation
+├── data/                        # Runtime database files (auto-created, gitignored)
 │   └── todo.db
+├── .clang-format                # Clang-format style config
 ├── CMakeLists.txt
-├── CMakePresets.json       # Defines the "vcpkg" configure preset
-└── vcpkg.json              # vcpkg manifest with dependency declarations
+├── CMakePresets.json            # Defines the "vcpkg" configure preset
+└── vcpkg.json                   # vcpkg manifest with dependency declarations
 ```
 
 ---
@@ -354,8 +429,6 @@ CREATE TABLE IF NOT EXISTS todos (
     user_id    TEXT NOT NULL,
     title      TEXT NOT NULL,
     completed  INTEGER NOT NULL DEFAULT 0,  -- 0 = false, 1 = true
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
     FOREIGN KEY(user_id) REFERENCES users(id)
 );
 ```
@@ -366,13 +439,26 @@ CREATE TABLE IF NOT EXISTS todos (
 
 ## Roadmap
 
-- [ ] **Basic Auth middleware** - Decode `Authorization` header, verify credentials, gate all todo routes
-- [ ] **Todo CRUD** - Full create, read, update, delete for todos per authenticated user
-- [ ] **Input validation** - Length limits, sanitization
-- [ ] **Logging** - Structured request/response logging
-- [ ] **Tests** - Unit and integration tests
-- [ ] **Docker Compose** - Containerized deployment
-- [ ] **Password hardening** *(optional)* - Swap SHA-256 for Argon2 or bcrypt
+- [x] **Basic Auth middleware** — Decodes `Authorization` header, verifies credentials, injects `user_id` into Crow context
+- [x] **`POST /todos`** — Create a todo for the authenticated user
+- [x] **`GET /todos`** — List all todos for the authenticated user
+- [x] **`GET /me`** — Return the authenticated user's profile
+- [ ] **`GET /todos/:id`** — Get a specific todo by ID
+- [ ] **`PUT /todos/:id`** — Update todo title or completion status
+- [ ] **`DELETE /todos/:id`** — Delete a todo
+- [ ] **Input validation** — Length limits, sanitization
+- [ ] **Logging** — Structured request/response logging
+- [ ] **Tests** — Unit and integration tests
+- [ ] **Docker Compose** — Containerized deployment
+- [ ] **Password hardening** *(optional)* — Swap SHA-256 for Argon2 or bcrypt
+
+---
+
+## My Thoughts
+
+  I thought this would be simple. It was kind of simple but was also hard. Many times, things did not work the way they were supposed to because of some typo or some other silly mistake. For example, I have broken the SQL queries into 2 strings and just placed them side by side. I forgot to add a space and now it does not work properly. All errors were fixable in the end. But overall, it follows the same pattern over and over again, so it was nice. (maybe I should have used something like an ORM?)
+
+  It was a good learning experience. I have learned a lot about C++ and web development. I still like C++.
 
 ---
 
