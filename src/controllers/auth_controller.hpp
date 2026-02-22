@@ -1,8 +1,9 @@
 #pragma once
+#include "../middleware/auth_middleware.hpp"
 #include "../services/auth_service.hpp"
 #include <crow.h>
 
-template <typename App> void register_auth_routes(App &app, AuthService &authService)
+template <typename App> void register_auth_routes(App &app, AuthService &authService, UserRepository &userRepo)
 {
     CROW_ROUTE(app, "/register").methods(crow::HTTPMethod::Post)([&authService](const crow::request &req) {
         auto body = crow::json::load(req.body);
@@ -25,5 +26,25 @@ template <typename App> void register_auth_routes(App &app, AuthService &authSer
             return crow::response(409, "User exists");
 
         return crow::response(201, "User created");
+    });
+
+    CROW_ROUTE(app, "/me")
+    ([&app, &userRepo](const crow::request &req) {
+        auto &ctx = app.template get_context<AuthMiddleware>(req);
+
+        if (!ctx.user_id)
+            return crow::response(401, "Unauthorized");
+
+        auto user = userRepo.findById(*ctx.user_id);
+
+        if (!user)
+            return crow::response(404, "User not found");
+
+        crow::json::wvalue response;
+
+        response["id"] = user->id;
+        response["username"] = user->username;
+
+        return crow::response(response);
     });
 }

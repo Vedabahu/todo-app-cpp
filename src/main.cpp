@@ -22,7 +22,7 @@ int main()
     app.get_middleware<AuthMiddleware>().auth_service = &authService;
     app.use_compression(crow::compression::algorithm::GZIP);
 
-    register_auth_routes(app, authService);
+    register_auth_routes(app, authService, userRepo);
 
     CROW_ROUTE(app, "/add/<int>/<int>")
     ([](int a, int b) { return std::to_string(a + b); });

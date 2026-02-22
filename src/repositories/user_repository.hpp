@@ -12,6 +12,7 @@ class UserRepository
     bool usernameExists(const std::string &username);
     void createUser(const User &user);
     std::optional<User> findByUsername(const std::string &username);
+    std::optional<User> findById(const std::string &id);
 
   private:
     const Database &database_;
