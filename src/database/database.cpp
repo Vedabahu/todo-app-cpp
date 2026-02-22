@@ -11,9 +11,7 @@ sqlite3 *Database::openConnection() const
 
     int rc = sqlite3_open(db_path_.c_str(), &db);
     if (rc != SQLITE_OK)
-    {
         throw std::runtime_error("Failed to open database");
-    }
 
     return db;
 }

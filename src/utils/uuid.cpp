@@ -11,9 +11,7 @@ std::string generate_uuid()
     unsigned char bytes[16];
 
     for (int i = 0; i < 16; ++i)
-    {
         bytes[i] = static_cast<unsigned char>(dis(gen));
-    }
 
     // Set version (4) and variant bits
     bytes[6] = (bytes[6] & 0x0F) | 0x40; // Version 4
