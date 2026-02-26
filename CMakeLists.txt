@@ -13,6 +13,11 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Debug")
 endif()
 
+find_program(CCACHE ccache REQUIRED)
+
+set(CMAKE_C_COMPILER_LAUNCHER ${CCACHE})
+set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE})
+
 add_subdirectory(external/Crow)
 
 find_package(OpenSSL REQUIRED)
